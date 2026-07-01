@@ -3,8 +3,7 @@ const OpenAI = require('openai');
 const P = require('pino');
 const http = require('http');
 
-// سيرفر وهمي عشان Render ما يوقف البوت
-http.createServer((req, res) => res.end('Bot running')).listen(3000);
+http.createServer((req, res) => res.end('Bot running')).listen(process.env.PORT || 3000);
 
 const groq = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
@@ -29,18 +28,32 @@ async function startBot() {
       console.log('متصل بنجاح ✅');
     }
     if (connection === 'close') {
-      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      if (shouldReconnect) startBot();
+      const code = lastDisconnect?.error?.output?.statusCode;
+      if (code !== DisconnectReason.loggedOut) startBot();
     }
   });
 
   if (!state.creds.registered) {
-    await new Promise(r => setTimeout(r, 5000));
-    const number = process.env.PHONE_NUMBER;
-    const code = await sock.requestPairingCode(number);
-    console.log('===== كود الربط =====');
-    console.log(code);
-    console.log('=====================');
+    await new Promise(r => setTimeout(r, 15000));
+    try {
+      const number = process.env.PHONE_NUMBER;
+      const code = await sock.requestPairingCode(number);
+      console.log('===== كود الربط =====');
+      console.log(code);
+      console.log('=====================');
+    } catch(e) {
+      console.log('خطأ في الكود، إعادة المحاولة بعد 10 ثواني...');
+      await new Promise(r => setTimeout(r, 10000));
+      try {
+        const number = process.env.PHONE_NUMBER;
+        const code = await sock.requestPairingCode(number);
+        console.log('===== كود الربط =====');
+        console.log(code);
+        console.log('=====================');
+      } catch(e2) {
+        console.log('فشل الكود:', e2.message);
+      }
+    }
   }
 
   sock.ev.on('messages.upsert', async ({ messages }) => {
@@ -54,10 +67,7 @@ async function startBot() {
       const question = text.replace('!عمي', '').trim();
       if (!question) return;
       conversations[groupId] = [
-        {
-          role: 'system',
-          content: 'أنت شخصية اسمها عمك حسام، شخص ليبي عامي مضحك وذكي وعارف كل شي في السياسة والرياضة والطب والذكاء الاصطناعي. تتكلم بالعامية الليبية وتهدرز. أول ما حد يكلمك ترد بـ "معاك عمك حسام الأعظم يتلب شن تبي؟" وبعدها ترد بشكل مضحك. لو حد سبك سبه بدون تردد.'
-        },
+        { role: 'system', content: 'أنت شخصية اسمها عمك حسام، شخص ليبي عامي مضحك وذكي وعارف كل شي في السياسة والرياضة والطب والذكاء الاصطناعي. تتكلم بالعامية الليبية وتهدرز. أول ما حد يكلمك ترد بـ "معاك عمك حسام الأعظم يتلب شن تبي؟" وبعدها ترد بشكل مضحك. لو حد سبك سبه بدون تردد.' },
         { role: 'user', content: question }
       ];
       try {
@@ -69,9 +79,7 @@ async function startBot() {
         const answer = completion.choices[0].message.content;
         conversations[groupId].push({ role: 'assistant', content: answer });
         await sock.sendMessage(groupId, { text: answer }, { quoted: msg });
-      } catch (e) {
-        console.log('خطأ:', e.message);
-      }
+      } catch (e) { console.log('خطأ:', e.message); }
       return;
     }
 
@@ -89,9 +97,7 @@ async function startBot() {
           const answer = completion.choices[0].message.content;
           conversations[groupId].push({ role: 'assistant', content: answer });
           await sock.sendMessage(groupId, { text: answer }, { quoted: msg });
-        } catch (e) {
-          console.log('خطأ:', e.message);
-        }
+        } catch (e) { console.log('خطأ:', e.message); }
       }
     }
   });
