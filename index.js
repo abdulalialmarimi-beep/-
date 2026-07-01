@@ -3,7 +3,7 @@ const OpenAI = require('openai');
 const P = require('pino');
 const http = require('http');
 
-http.createServer((req, res) => res.end('Bot running')).listen(process.env.PORT || 3000);
+http.createServer((req, res) => res.end('Bot running')).listen(process.env.PORT || 10000);
 
 const groq = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
