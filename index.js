@@ -12,10 +12,18 @@ async function startBot() {
   const sock = makeWASocket({
     auth: state,
     logger: P({ level: 'silent' }),
-    printQRInTerminal: true
+    printQRInTerminal: false
   });
 
   sock.ev.on('creds.update', saveCreds);
+
+  if (!state.creds.registered) {
+    const number = process.env.PHONE_NUMBER;
+    const code = await sock.requestPairingCode(number);
+    console.log('===== كود الربط =====');
+    console.log(code);
+    console.log('=====================');
+  }
 
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect } = update;
@@ -23,7 +31,7 @@ async function startBot() {
       const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
       if (shouldReconnect) startBot();
     } else if (connection === 'open') {
-      console.log('متصل بنجاح');
+      console.log('متصل بنجاح ✅');
     }
   });
 
@@ -31,13 +39,19 @@ async function startBot() {
     const msg = messages[0];
     if (!msg.message || msg.key.fromMe) return;
     const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
-    if (text.startsWith('!دكتور')) {
-      const question = text.replace('!دكتور', '').trim();
+    if (text.startsWith('!عمي')) {
+      const question = text.replace('!عمي', '').trim();
       if (!question) return;
       try {
         const completion = await groq.chat.completions.create({
           model: 'llama-3.3-70b-versatile',
-          messages: [{ role: 'user', content: question }],
+          messages: [
+            {
+              role: 'system',
+              content: 'أنت شخصية اسمها عمك حسام، شخص ليبي عامي مضحك وعارف كل شي. أول ما حد يكلمك ترد دايما بـ "معاك عمك حسام الأعظم يتلب شن تبي؟" وتتكلم بالعامية الليبية وتهدرز وتتكلم عن رياضة وسيارات وأمور الشباب بأسلوب مضحك ومتعجرف بطريقة كوميدية. لو حد سبك سبه بنفس الأسلوب بدون تردد وبعدين رد على سؤاله.'
+            },
+            { role: 'user', content: question }
+          ],
           max_tokens: 500
         });
         const answer = completion.choices[0].message.content;
