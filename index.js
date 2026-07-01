@@ -31,7 +31,7 @@ async function startBot() {
   });
 
   if (!state.creds.registered) {
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise(r => setTimeout(r, 8000));
     const number = process.env.PHONE_NUMBER;
     const code = await sock.requestPairingCode(number);
     console.log('===== كود الربط =====');
