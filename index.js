@@ -17,23 +17,25 @@ async function startBot() {
 
   sock.ev.on('creds.update', saveCreds);
 
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect } = update;
+    if (connection === 'open') {
+      console.log('متصل بنجاح ✅');
+    }
+    if (connection === 'close') {
+      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+      if (shouldReconnect) startBot();
+    }
+  });
+
   if (!state.creds.registered) {
+    await new Promise(r => setTimeout(r, 3000));
     const number = process.env.PHONE_NUMBER;
     const code = await sock.requestPairingCode(number);
     console.log('===== كود الربط =====');
     console.log(code);
     console.log('=====================');
   }
-
-  sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect } = update;
-    if (connection === 'close') {
-      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      if (shouldReconnect) startBot();
-    } else if (connection === 'open') {
-      console.log('متصل بنجاح ✅');
-    }
-  });
 
   sock.ev.on('messages.upsert', async ({ messages }) => {
     const msg = messages[0];
